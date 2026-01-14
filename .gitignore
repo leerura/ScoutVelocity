@@ -35,3 +35,17 @@ out/
 
 ### VS Code ###
 .vscode/
+
+# Python Virtual Environment
+venv/
+venv
+
+### Application Profiles (sensitive data) ###
+application-local.yml
+application-dev.yml
+application-prod.yml
+
+
+match_records_3m_uniform.csv
+male_players.csv
+players_final_100k.csv
