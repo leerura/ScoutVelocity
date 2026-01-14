@@ -72,9 +72,8 @@ public class PerformanceController {
     // === Private Methods ===
     
     private StepReportDto generateStepReport(PerformanceStep step) {
-        List<PerformanceLog> logs = performanceLogRepository.findAll().stream()
-                .filter(log -> log.getStep() == step)
-                .collect(Collectors.toList());
+        // N+1 방지: findAll() + filter 대신 findByStep() 사용
+        List<PerformanceLog> logs = performanceLogRepository.findByStep(step);
         
         if (logs.isEmpty()) {
             return StepReportDto.empty(step);
@@ -113,10 +112,21 @@ public class PerformanceController {
     private Map<String, String> calculateImprovements(Map<PerformanceStep, StepReportDto> reports) {
         Map<String, String> improvements = new HashMap<>();
         
-        Long plainTime = reports.get(PerformanceStep.PLAIN).getControllerAvg();
-        Long indexTime = reports.get(PerformanceStep.INDEX).getControllerAvg();
-        Long optimizedTime = reports.get(PerformanceStep.OPTIMIZED).getControllerAvg();
-        Long cachedTime = reports.get(PerformanceStep.CACHED).getControllerAvg();
+        // NPE 방어: 각 Step의 리포트 존재 확인
+        StepReportDto plainReport = reports.get(PerformanceStep.PLAIN);
+        StepReportDto indexReport = reports.get(PerformanceStep.INDEX);
+        StepReportDto optimizedReport = reports.get(PerformanceStep.OPTIMIZED);
+        StepReportDto cachedReport = reports.get(PerformanceStep.CACHED);
+        
+        if (plainReport == null || indexReport == null || 
+            optimizedReport == null || cachedReport == null) {
+            return improvements;  // 데이터 부족 시 빈 Map 반환
+        }
+        
+        Long plainTime = plainReport.getControllerAvg();
+        Long indexTime = indexReport.getControllerAvg();
+        Long optimizedTime = optimizedReport.getControllerAvg();
+        Long cachedTime = cachedReport.getControllerAvg();
         
         if (plainTime > 0 && indexTime > 0) {
             improvements.put("PLAIN_to_INDEX", String.format("%.1fx faster", (double) plainTime / indexTime));

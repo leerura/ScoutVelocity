@@ -1,6 +1,7 @@
 package com.scoutvelocity.scoutvelocity.global.performance;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -10,6 +11,11 @@ import java.util.List;
  * PerformanceLog Repository
  */
 public interface PerformanceLogRepository extends JpaRepository<PerformanceLog, Long> {
+    
+    /**
+     * Step별 로그 조회 (N+1 방지)
+     */
+    List<PerformanceLog> findByStep(PerformanceStep step);
     
     /**
      * Step별 평균 실행 시간 조회
@@ -30,6 +36,7 @@ public interface PerformanceLogRepository extends JpaRepository<PerformanceLog, 
     /**
      * Step별 전체 데이터 삭제 (재측정용)
      */
+    @Modifying
     void deleteByStep(PerformanceStep step);
     
     /**

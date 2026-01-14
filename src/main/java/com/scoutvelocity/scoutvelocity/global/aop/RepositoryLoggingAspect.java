@@ -30,7 +30,11 @@ public class RepositoryLoggingAspect {
     @PersistenceContext
     private EntityManager entityManager;
     
-    @Around("execution(* com.scoutvelocity.scoutvelocity.domain..repository.*.*(..))")
+    @Around("execution(* com.scoutvelocity.scoutvelocity.domain..repository.*.*(..)) && " +
+            "!execution(* *.toString(..)) && " +
+            "!execution(* *.equals(..)) && " +
+            "!execution(* *.hashCode(..)) && " +
+            "!within(com.scoutvelocity.scoutvelocity.global.performance.PerformanceLogRepository)")
     public Object logRepositoryExecution(ProceedingJoinPoint joinPoint) throws Throwable {
         
         String className = joinPoint.getTarget().getClass().getSimpleName();
@@ -50,6 +54,9 @@ public class RepositoryLoggingAspect {
             long duration = System.currentTimeMillis() - startTime;
             
             // 실행된 쿼리 개수
+            // NOTE: Hibernate Statistics는 SessionFactory 전역 통계이므로
+            // 멀티스레드 환경에서는 다른 요청의 쿼리가 포함될 수 있습니다.
+            // 따라서 이 값은 근사치로 간주해야 합니다.
             long queryCountAfter = statistics.getQueryExecutionCount();
             int queryCount = (int) (queryCountAfter - queryCountBefore);
             
@@ -64,6 +71,14 @@ public class RepositoryLoggingAspect {
     private Statistics getHibernateStatistics() {
         SessionFactory sessionFactory = entityManager.getEntityManagerFactory()
                 .unwrap(SessionFactory.class);
-        return sessionFactory.getStatistics();
+        Statistics statistics = sessionFactory.getStatistics();
+        
+        // Statistics 활성화 여부 확인
+        if (!statistics.isStatisticsEnabled()) {
+            log.warn("Hibernate Statistics are disabled. Query counts will be inaccurate. " +
+                    "Please ensure 'hibernate.generate_statistics=true' is set in application.yml");
+        }
+        
+        return statistics;
     }
 }

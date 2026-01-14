@@ -23,7 +23,8 @@ public class ControllerLoggingAspect {
     private final PerformanceCollector performanceCollector;
     
     @Around("within(@org.springframework.web.bind.annotation.RestController *) && " +
-            "execution(public * *(..))")
+            "execution(public * *(..)) && " +
+            "!within(com.scoutvelocity.scoutvelocity.global.controller.PerformanceController)")
     public Object logControllerExecution(ProceedingJoinPoint joinPoint) throws Throwable {
         
         // 요청 시작 (RequestId 생성)

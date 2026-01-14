@@ -12,7 +12,14 @@ import java.time.LocalDateTime;
  * 쿼리 개수를 기록하여 단계별 성능 비교 데이터 제공
  */
 @Entity
-@Table(name = "performance_logs")
+@Table(
+    name = "performance_logs",
+    indexes = {
+        @Index(name = "idx_perf_step", columnList = "step"),
+        @Index(name = "idx_perf_layer", columnList = "layer"),
+        @Index(name = "idx_perf_step_layer", columnList = "step, layer")
+    }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor

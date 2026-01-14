@@ -42,7 +42,15 @@ public class PerformanceCollector {
     @Transactional
     public void record(Layer layer, String className, String methodName, long durationMs, Integer queryCount) {
         try {
-            PerformanceStep step = PerformanceStep.valueOf(currentStepName);
+            // 설정값 검증
+            PerformanceStep step;
+            try {
+                step = PerformanceStep.valueOf(currentStepName);
+            } catch (IllegalArgumentException e) {
+                log.error("Invalid performance.current-step value: {}. Must be one of: PLAIN, INDEX, OPTIMIZED, CACHED", 
+                         currentStepName);
+                return;  // 잘못된 설정값이면 기록 중단
+            }
             
             PerformanceLog performanceLog = PerformanceLog.builder()
                     .step(step)
