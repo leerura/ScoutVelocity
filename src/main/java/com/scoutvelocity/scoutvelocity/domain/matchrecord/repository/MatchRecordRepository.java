@@ -1,6 +1,6 @@
-package com.scoutvelocity.scoutvelocity.domain.matchRecord.repository;
+package com.scoutvelocity.scoutvelocity.domain.matchrecord.repository;
 
-import com.scoutvelocity.scoutvelocity.domain.matchRecord.MatchRecord;
+import com.scoutvelocity.scoutvelocity.domain.matchrecord.MatchRecord;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 /**

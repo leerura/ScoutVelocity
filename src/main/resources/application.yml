@@ -5,11 +5,18 @@ spring:
   jpa:
     open-in-view: false
     show-sql: true
+    hibernate:
+      ddl-auto: update  # 테이블 유지 (create/drop 금지)
     properties:
       hibernate:
         format_sql: true
+        generate_statistics: true  # Hibernate Statistics 활성화
 
 logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# 성능 측정 설정
+performance:
+  current-step: PLAIN  # PLAIN, INDEX, OPTIMIZED, CACHED
