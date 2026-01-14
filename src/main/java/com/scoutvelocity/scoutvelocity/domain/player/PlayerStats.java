@@ -55,7 +55,7 @@ public class PlayerStats {
     private MentalityStats mentality;
     
     @Embedded
-    private DefendingStats defending;
+    private DefendingStats defendingStats;  // ← 필드명 변경 (defending → defendingStats)
     
     @Embedded
     private GoalkeepingStats goalkeeping;

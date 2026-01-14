@@ -1,4 +1,4 @@
-package com.scoutvelocity.scoutvelocity.domain.matchRecord;
+package com.scoutvelocity.scoutvelocity.domain.matchrecord;
 
 import com.scoutvelocity.scoutvelocity.domain.player.Player;
 import jakarta.persistence.*;

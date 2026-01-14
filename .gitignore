@@ -46,6 +46,10 @@ application-dev.yml
 application-prod.yml
 
 
-match_records_3m_uniform.csv
+leagues.csv
 male_players.csv
+match_records_3m_uniform.csv
+clubs.csv
+nationalities.csv
+players_24_season.csv
 players_final_100k.csv
