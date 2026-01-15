@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 /**
  * 선수 조회 서비스 (Step 1: Plain - 비효율의 끝판왕)
  *
- * 전략: findAll()로 전체 데이터(100,000건)를 메모리에 로드한 후 Stream으로 필터링
+ * 전략: findAll()로 전체 데이터(선수: 100,000건, 경기: 3,000,000건)를 메모리에 로드한 후 Stream으로 필터링
  */
 @Service
 @RequiredArgsConstructor
@@ -238,19 +238,6 @@ public class PlayerQueryService {
         return result;
     }
 
-    private Comparator<PlayerResponseDto> getComparator(String sortBy) {
-        return switch (sortBy.toLowerCase()) {
-            case "potential" -> Comparator.comparing(PlayerResponseDto::getPotential,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "age" -> Comparator.comparing(PlayerResponseDto::getAge,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            case "value" -> Comparator.comparing(PlayerResponseDto::getValueEur,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-            default -> Comparator.comparing(PlayerResponseDto::getOverall,
-                    Comparator.nullsLast(Comparator.naturalOrder()));
-        };
-    }
-
     /**
      * 시나리오 7: 최근 폼 상태 조회 (날짜 범위 + 집계)
      *
@@ -311,4 +298,19 @@ public class PlayerQueryService {
         log.info("[PLAIN] 최근 폼 조회 완료 - 결과 {}건", result.size());
         return result;
     }
+
+    private Comparator<PlayerResponseDto> getComparator(String sortBy) {
+        return switch (sortBy.toLowerCase()) {
+            case "potential" -> Comparator.comparing(PlayerResponseDto::getPotential,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "age" -> Comparator.comparing(PlayerResponseDto::getAge,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            case "value" -> Comparator.comparing(PlayerResponseDto::getValueEur,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+            default -> Comparator.comparing(PlayerResponseDto::getOverall,
+                    Comparator.nullsLast(Comparator.naturalOrder()));
+        };
+    }
+
+
 }
