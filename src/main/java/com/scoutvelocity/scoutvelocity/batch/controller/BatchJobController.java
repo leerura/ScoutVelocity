@@ -33,7 +33,7 @@ public class BatchJobController {
     @PostMapping("/import")
     public String runDataImport() {
         batchJobService.executeJobAsync();
-        return "Data import job started! Check logs for progress. Expected time: ~6 minutes";
+        return "Data import job started! Check logs for progress. Expected time: ~22 minutes";
     }
     
     /**
