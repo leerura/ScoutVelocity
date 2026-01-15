@@ -40,4 +40,4 @@ logging:
 
 # 성능 측정 설정
 performance:
-  current-step: PLAIN  # PLAIN, INDEX, OPTIMIZED, CACHED
+  current-step: INDEX  # PLAIN, INDEX, OPTIMIZED, CACHED

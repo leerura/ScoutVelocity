@@ -11,14 +11,21 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 선수 엔티티 (Plain Version)
+ * 선수 엔티티 (Step 2: Index)
  * 
- * Step 1: Plain 상태 (인덱스X, 캐시X)
- * - 벤치마크 baseline 측정용
- * - 순수 JPA 기본 설정만 사용
+ * Step 2: 인덱스 추가 + 쿼리 메서드
+ * - DB 레벨 필터링으로 성능 개선
+ * - 하지만 메서드 폭발 & N+1 문제 존재
  */
 @Entity
-@Table(name = "players")
+@Table(name = "players", indexes = {
+    @Index(name = "idx_club_id", columnList = "club_id"),
+    @Index(name = "idx_nationality_id", columnList = "nationality_id"),
+    @Index(name = "idx_player_positions", columnList = "player_positions"),
+    @Index(name = "idx_age", columnList = "age"),
+    @Index(name = "idx_potential", columnList = "potential"),
+    @Index(name = "idx_overall", columnList = "overall")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor

@@ -26,9 +26,16 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 선수 조회 서비스 (Step 1: Plain - 비효율의 끝판왕)
- *
- * 전략: findAll()로 전체 데이터(선수: 100,000건, 경기: 3,000,000건)를 메모리에 로드한 후 Stream으로 필터링
+ * 선수 조회 서비스 (Step 2: Index + 쿼리 메서드 - 개선되지만 한계 명확)
+ * 전략: 커스텀 쿼리 메서드로 DB 필터링 (일부는 여전히 Stream 의존)
+ * 개선점:
+ * - DB 레벨 필터링으로 메모리 부하 감소
+ * - 인덱스 활용으로 조회 속도 향상
+ * 한계점 (의도적):
+ * 1. 메서드 폭발: 조건 조합마다 Repository 메서드 필요
+ * 2. N+1 문제: 연관관계 로딩 시 추가 쿼리 발생
+ * 3. 동적 쿼리 불가: 선택적 파라미터 처리 어려움
+ * 4. 집계 쿼리: 여전히 메모리 집계 (시나리오 6, 7)
  */
 @Service
 @RequiredArgsConstructor
@@ -41,24 +48,36 @@ public class PlayerQueryService {
 
     /**
      * 시나리오 1: 클럽별 선수 조회
+     * <p>
+     * ✅ 개선: findByClub_Id 사용 → DB 필터링
+     * ✅ 효과: 100,000건 → ~30건만 로드
+     * ⚠️ 한계: N+1 가능 (club 정보 접근 시)
+     * 결과: 1초 정도 안 걸림
      */
     public List<PlayerResponseDto> findByClub(Long clubId) {
-        log.info("[PLAIN] 클럽별 조회 시작 - clubId: {}", clubId);
+        log.info("[INDEX] 클럽별 조회 시작 - clubId: {}", clubId);
 
-        List<Player> allPlayers = playerRepository.findAll();
-        log.info("[PLAIN] 전체 선수 로드 완료 - 총 {}건", allPlayers.size());
+        // Step 1과 차이: findAll() → findByClub_Id()
+        List<Player> players = playerRepository.findByClub_Id(clubId);
+        log.info("[INDEX] DB 필터링 완료 - 조회 결과 {}건 (인덱스 활용)", players.size());
 
-        List<PlayerResponseDto> result = allPlayers.stream()
-                .filter(p -> p.getClub() != null && p.getClub().getId().equals(clubId))
+        List<PlayerResponseDto> result = players.stream()
                 .map(PlayerResponseDto::from)
                 .collect(Collectors.toList());
 
-        log.info("[PLAIN] 클럽별 조회 완료 - 결과 {}건", result.size());
+        log.info("[INDEX] 클럽별 조회 완료 - 결과 {}건", result.size());
         return result;
     }
 
     /**
      * 시나리오 2: 포지션 + 복합 능력치 필터링
+     * ⚠️ 메서드 폭발 문제 발생!
+     * - 조건 조합마다 Repository 메서드 필요
+     * - 4개 조건 → 2^4 = 16개 메서드 필요
+     * - 현실적으로 불가능 → 부분적 쿼리 메서드 + Stream 병행
+     * ✅ 개선: position 필터링은 DB에서 처리
+     * ❌ 한계: 나머지 능력치는 여전히 메모리 필터링
+     * 결과: 1초 정도 걸림
      */
     public List<PlayerResponseDto> findByPositionAndStats(
             String position,
@@ -66,13 +85,22 @@ public class PlayerQueryService {
             Integer minShooting,
             Integer minPhysical
     ) {
-        log.info("[PLAIN] 복합 필터링 조회 시작");
+        log.info("[INDEX] 복합 필터링 조회 시작");
 
-        List<Player> allPlayers = playerRepository.findAll();
+        // 포지션이 있으면 DB 필터링, 없으면 전체 조회
+        List<Player> players;
+        if (position != null) {
+            // ✅ 개선: position은 DB에서 필터링 (인덱스 활용)
+            players = playerRepository.findByPlayerPositionsContaining(position);
+            log.info("[INDEX] 포지션 필터링 완료 - {}건 (DB 처리)", players.size());
+        } else {
+            // ⚠️ 한계: position이 null이면 여전히 findAll()
+            players = playerRepository.findAll();
+            log.warn("[INDEX] 포지션 조건 없음 - 전체 {}건 로드 (비효율)", players.size());
+        }
 
-        List<PlayerResponseDto> result = allPlayers.stream()
-                .filter(p -> position == null ||
-                        (p.getPlayerPositions() != null && p.getPlayerPositions().contains(position)))
+        // ❌ 한계: 나머지 조건은 메모리 필터링 (메서드 폭발 회피 위해)
+        List<PlayerResponseDto> result = players.stream()
                 .filter(p -> minPace == null ||
                         (p.getStats().getPace() != null && p.getStats().getPace() >= minPace))
                 .filter(p -> minShooting == null ||
@@ -82,12 +110,19 @@ public class PlayerQueryService {
                 .map(PlayerResponseDto::from)
                 .collect(Collectors.toList());
 
-        log.info("[PLAIN] 복합 필터링 완료 - 결과 {}건", result.size());
+        log.info("[INDEX] 복합 필터링 완료 - 결과 {}건 (Stream 후처리)", result.size());
         return result;
     }
 
     /**
      * 시나리오 3: 연령대 + 포텐셜 기반 유망주 발굴 (정렬 포함)
+     * ⚠️ 메서드 폭발 + 동적 정렬 불가 문제
+     * - age 범위 + potential 조건 → 쿼리 메서드로 처리 가능
+     * - 하지만 정렬 기준이 동적 → 메서드 추가 필요
+     * (OrderByPotentialDesc, OrderByOverallDesc, OrderByAgeDesc...)
+     * ✅ 개선: age, potential 필터링은 DB 처리
+     * ❌ 한계: 동적 정렬은 메모리에서 처리 (메서드 폭발 회피)
+     * 1초 정도 걸림
      */
     public List<PlayerResponseDto> findYoungTalents(
             Integer minAge,
@@ -96,30 +131,54 @@ public class PlayerQueryService {
             String sortBy,
             String order
     ) {
-        log.info("[PLAIN] 유망주 발굴 시작");
+        log.info("[INDEX] 유망주 발굴 시작");
 
-        List<Player> allPlayers = playerRepository.findAll();
+        List<Player> players;
 
-        List<PlayerResponseDto> filtered = allPlayers.stream()
-                .filter(p -> minAge == null || (p.getAge() != null && p.getAge() >= minAge))
-                .filter(p -> maxAge == null || (p.getAge() != null && p.getAge() <= maxAge))
-                .filter(p -> minPotential == null || (p.getPotential() != null && p.getPotential() >= minPotential))
+        // ✅ 개선: age, potential 조건은 DB 필터링
+        if (minAge != null && maxAge != null && minPotential != null) {
+            players = playerRepository.findByAgeBetweenAndPotentialGreaterThanEqual(
+                    minAge, maxAge, minPotential
+            );
+            log.info("[INDEX] DB 필터링 완료 - {}건 (인덱스 활용)", players.size());
+        } else if (minAge != null && maxAge != null) {
+            players = playerRepository.findByAgeBetween(minAge, maxAge);
+            log.info("[INDEX] 연령대 필터링 완료 - {}건", players.size());
+        } else {
+            // ⚠️ 조건 조합이 없으면 findAll() (동적 쿼리 불가의 한계)
+            players = playerRepository.findAll();
+            log.warn("[INDEX] 조건 불충분 - 전체 {}건 로드", players.size());
+
+            // Stream으로 후처리
+            players = players.stream()
+                    .filter(p -> minAge == null || (p.getAge() != null && p.getAge() >= minAge))
+                    .filter(p -> maxAge == null || (p.getAge() != null && p.getAge() <= maxAge))
+                    .filter(p -> minPotential == null || (p.getPotential() != null && p.getPotential() >= minPotential))
+                    .collect(Collectors.toList());
+        }
+
+        // ❌ 한계: 동적 정렬은 메모리 처리 (정렬마다 메서드 추가는 비현실적)
+        List<PlayerResponseDto> result = players.stream()
                 .map(PlayerResponseDto::from)
                 .collect(Collectors.toList());
 
         Comparator<PlayerResponseDto> comparator = getComparator(sortBy != null ? sortBy : "overall");
         if ("asc".equalsIgnoreCase(order)) {
-            filtered.sort(comparator);
+            result.sort(comparator);
         } else {
-            filtered.sort(comparator.reversed());
+            result.sort(comparator.reversed());
         }
 
-        log.info("[PLAIN] 유망주 발굴 완료 - 결과 {}건", filtered.size());
-        return filtered;
+        log.info("[INDEX] 유망주 발굴 완료 - 결과 {}건 (정렬은 메모리)", result.size());
+        return result;
     }
 
     /**
      * 시나리오 4: 리그 + 국적 + 페이징 (복합 조건)
+     * ✅ 개선: DB 필터링 + Pageable 활용
+     * ⚠️ N+1 문제: club.league 접근 시 추가 쿼리 발생 (fetch join 없음)
+     * ❌ 한계: 조건 조합마다 메서드 필요 (3가지 조합 = 3개 메서드)
+     * 결과: 1초 정도 걸림
      */
     public PageResponseDto<PlayerResponseDto> findByLeagueAndNationality(
             Long leagueId,
@@ -127,72 +186,73 @@ public class PlayerQueryService {
             int page,
             int size
     ) {
-        log.info("[PLAIN] 리그+국적 조회 시작");
-
-        List<Player> allPlayers = playerRepository.findAll();
-
-        List<PlayerResponseDto> filtered = allPlayers.stream()
-                .filter(p -> leagueId == null ||
-                        (p.getClub() != null && p.getClub().getLeague() != null &&
-                                p.getClub().getLeague().getId().equals(leagueId)))
-                .filter(p -> nationalityId == null ||
-                        (p.getNationality() != null && p.getNationality().getId().equals(nationalityId)))
-                .map(PlayerResponseDto::from)
-                .collect(Collectors.toList());
-
-        int start = page * size;
-        int end = Math.min(start + size, filtered.size());
-        List<PlayerResponseDto> pageContent = filtered.subList(start, end);
+        log.info("[INDEX] 리그+국적 조회 시작");
 
         Pageable pageable = PageRequest.of(page, size);
-        Page<PlayerResponseDto> resultPage = new PageImpl<>(pageContent, pageable, filtered.size());
+        Page<Player> playerPage;
 
-        log.info("[PLAIN] 리그+국적 조회 완료 - 전체 {}건", filtered.size());
-        return PageResponseDto.of(resultPage);
+        // ❌ 한계: 조건 조합마다 다른 메서드 호출 (동적 쿼리 불가)
+        if (leagueId != null && nationalityId != null) {
+            // ⚠️ N+1 위험: club -> league 조인 없이 프록시로 접근
+            playerPage = playerRepository.findByClub_League_IdAndNationality_Id(
+                    leagueId, nationalityId, pageable
+            );
+            log.info("[INDEX] 리그+국적 필터링 완료 - {}건 (N+1 가능)", playerPage.getTotalElements());
+        } else if (leagueId != null) {
+            playerPage = playerRepository.findByClub_League_Id(leagueId, pageable);
+            log.info("[INDEX] 리그 필터링 완료 - {}건", playerPage.getTotalElements());
+        } else if (nationalityId != null) {
+            playerPage = playerRepository.findByNationality_Id(nationalityId, pageable);
+            log.info("[INDEX] 국적 필터링 완료 - {}건", playerPage.getTotalElements());
+        } else {
+            // 조건 없으면 전체 조회 (비효율)
+            playerPage = playerRepository.findAll(pageable);
+            log.warn("[INDEX] 조건 없음 - 전체 페이징 (비효율)");
+        }
+
+        Page<PlayerResponseDto> result = playerPage.map(PlayerResponseDto::from);
+
+        log.info("[INDEX] 리그+국적 조회 완료 - 페이지 {}/{}", page + 1, result.getTotalPages());
+        return PageResponseDto.of(result);
     }
 
     /**
-     * 시나리오 5: 선수별 경기 기록 조회 (JOIN 비효율)
-     *
-     * 비효율 포인트:
-     * 1. Player 전체 로드 (100,000건) - 검증용
-     * 2. MatchRecord 전체 로드 (3,000,000건)
-     * 3. 메모리 상에서 Loop 돌며 매칭 (JOIN)
+     * 시나리오 5: 선수별 경기 기록 조회 (JOIN 개선)
+     * ✅ 개선: findByPlayer_Id 사용 → 특정 선수 기록만 조회
+     * ✅ 효과: 3,000,000건 → ~100건으로 대폭 감소
+     * ⚠️ 한계: player 정보 접근 시 N+1 가능 (fetch join 없음)
+     * 결과: 1초도 안 걸림
      */
     public List<MatchRecordResponseDto> findMatchRecordsByPlayer(String playerId) {
-        log.info("[PLAIN] 경기 기록 조회 시작 - playerId: {}", playerId);
+        log.info("[INDEX] 경기 기록 조회 시작 - playerId: {}", playerId);
 
-        // 1. 선수 존재 확인을 위해 전체 로드 (비효율의 극치)
-        List<Player> allPlayers = playerRepository.findAll();
-        boolean playerExists = allPlayers.stream()
-                .anyMatch(p -> p.getId().equals(playerId));
+        // ✅ 개선: 전체 로드 없이 DB에서 바로 필터링
+        List<MatchRecord> records = matchRecordRepository.findByPlayer_Id(playerId);
 
-        if (!playerExists) {
-            throw new IllegalArgumentException("Player not found: " + playerId);
+        if (records.isEmpty()) {
+            log.warn("[INDEX] 경기 기록 없음 - playerId: {}", playerId);
+            throw new IllegalArgumentException("Player not found or no match records: " + playerId);
         }
 
-        // 2. 모든 경기 기록 로드 (약 300만 건)
-        log.info("[PLAIN] 전체 경기 기록 로드 시작 (주의: 메모리 급증 예상)");
-        List<MatchRecord> allRecords = matchRecordRepository.findAll();
-        log.info("[PLAIN] 전체 경기 기록 로드 완료 - 총 {}건", allRecords.size());
+        log.info("[INDEX] DB 필터링 완료 - {}건 (인덱스 활용)", records.size());
 
-        // 3. 메모리 JOIN (필터링)
-        List<MatchRecordResponseDto> result = allRecords.stream()
-                .filter(r -> r.getPlayer() != null && r.getPlayer().getId().equals(playerId))
-                .map(MatchRecordResponseDto::from) // DTO 변환
+        List<MatchRecordResponseDto> result = records.stream()
+                .map(MatchRecordResponseDto::from)
                 .collect(Collectors.toList());
 
-        log.info("[PLAIN] 경기 기록 조회 완료 - 결과 {}건", result.size());
+        log.info("[INDEX] 경기 기록 조회 완료 - 결과 {}건", result.size());
         return result;
     }
 
     /**
      * 시나리오 6: 골 + 어시스트 상위 공격수 조회 (메모리 집계)
-     *
-     * 비효율 포인트:
-     * - 300만 건 MatchRecord 전체 로드
-     * - 메모리에서 GROUP BY (선수별 집계)
-     * - 메모리에서 정렬 & 필터링
+     * ❌ 여전히 비효율: 메모리 집계 유지
+     * 이유:
+     * - GROUP BY, SUM, HAVING을 쿼리 메서드로 표현 불가
+     * - @Query로 네이티브 SQL 작성해야 하지만 Step 2 단계에선 제외
+     * - 집계 기능은 Step 3(QueryDSL)에서 해결 예정
+     * ⚠️ 한계: 여전히 전체 경기 기록 로드 (3,000,000건)
+     * 결과: 70초 정도 걸림
      */
     public List<TopScorerResponseDto> findTopScorers(
             String position,
@@ -200,21 +260,19 @@ public class PlayerQueryService {
             Integer minAssists,
             int limit
     ) {
-        log.info("[PLAIN] 상위 득점자 집계 시작 - position: {}, minGoals: {}, minAssists: {}", position, minGoals, minAssists);
+        log.info("[INDEX] 상위 득점자 집계 시작 - position: {}, minGoals: {}, minAssists: {}",
+                position, minGoals, minAssists);
 
-        // 1. 전체 경기 기록 로드 (IO & 메모리 폭발)
+        // ❌ 한계: 집계는 여전히 findAll() (쿼리 메서드로는 GROUP BY 불가)
         List<MatchRecord> allRecords = matchRecordRepository.findAll();
-        log.info("[PLAIN] 전체 경기 기록 로드 완료 - 총 {}건", allRecords.size());
+        log.warn("[INDEX] 전체 경기 기록 로드 - {}건 (집계는 여전히 비효율)", allRecords.size());
 
-        // 2. 메모리 상에서 데이터 가공 (CPU 부하)
-        // 선수별(Player)로 기록(MatchRecord)을 그룹핑
+        // 메모리 집계 (Step 1과 동일)
         Map<Player, List<MatchRecord>> playerRecordsMap = allRecords.stream()
-                // 2-1. 포지션 필터링 (N+1 발생 가능: player.getPlayerPositions 접근 시)
                 .filter(r -> position == null ||
                         (r.getPlayer() != null && r.getPlayer().getPlayerPositions().contains(position)))
                 .collect(Collectors.groupingBy(MatchRecord::getPlayer));
 
-        // 3. 그룹핑된 데이터로 통계 계산 (SUM)
         List<TopScorerResponseDto> result = playerRecordsMap.entrySet().stream()
                 .map(entry -> {
                     Player player = entry.getKey();
@@ -225,27 +283,27 @@ public class PlayerQueryService {
 
                     return TopScorerResponseDto.of(player, totalGoals, totalAssists);
                 })
-                // 4. 집계 후 조건 필터링 (HAVING 절을 메모리에서 처리)
                 .filter(dto -> minGoals == null || dto.getTotalGoals() >= minGoals)
                 .filter(dto -> minAssists == null || dto.getTotalAssists() >= minAssists)
-                // 5. 정렬 (ORDER BY를 메모리에서 처리)
                 .sorted(Comparator.comparingInt(TopScorerResponseDto::getTotalPoints).reversed())
-                // 6. 개수 제한 (LIMIT)
                 .limit(limit)
                 .collect(Collectors.toList());
 
-        log.info("[PLAIN] 상위 득점자 집계 완료 - 결과 {}건", result.size());
+        log.info("[INDEX] 상위 득점자 집계 완료 - 결과 {}건 (여전히 메모리 처리)", result.size());
         return result;
     }
 
     /**
      * 시나리오 7: 최근 폼 상태 조회 (날짜 범위 + 집계)
-     *
-     * 비효율 포인트:
-     * - 300만 건 전체 로드 (findAll)
-     * - 날짜 범위 필터링을 메모리에서 수행 (DB Index 미사용)
-     * - 선수별 평균 계산 (메모리)
-     * - 정렬 (메모리)
+     * ⚠️ 부분 개선: 날짜 범위는 DB 필터링 가능
+     * ❌ 여전히 비효율: 집계는 메모리 처리
+     * 개선점:
+     * - findByMatchDateBetween으로 날짜 범위 DB 필터링
+     * - 인덱스 활용으로 3,000,000건 → ~10,000건 감소
+     * 한계점:
+     * - GROUP BY, AVG 집계는 여전히 메모리
+     * - 선수별 그룹핑 및 평균 계산 CPU 부하
+     * 결과: 70초 정도
      */
     public List<RecentFormResponseDto> findRecentForm(
             LocalDate startDate,
@@ -253,35 +311,28 @@ public class PlayerQueryService {
             int minMatches,
             int limit
     ) {
-        log.info("[PLAIN] 최근 폼 조회 시작 - {} ~ {}, minMatches: {}", startDate, endDate, minMatches);
+        log.info("[INDEX] 최근 폼 조회 시작 - {} ~ {}, minMatches: {}", startDate, endDate, minMatches);
 
-        // 1. 전체 경기 기록 로드 (300만 건) - 역시나 여기서부터 헬게이트 오픈
-        List<MatchRecord> allRecords = matchRecordRepository.findAll();
-        log.info("[PLAIN] 전체 경기 기록 로드 완료 - 총 {}건", allRecords.size());
+        // ✅ 개선: 날짜 범위는 DB에서 필터링 (인덱스 활용)
+        List<MatchRecord> records = matchRecordRepository.findByMatchDateBetween(startDate, endDate);
+        log.info("[INDEX] 날짜 범위 필터링 완료 - {}건 (DB 처리, 인덱스 활용)", records.size());
 
-        // 2. 메모리에서 날짜 필터링 & 선수별 그룹핑
-        Map<Player, List<MatchRecord>> playerRecordsMap = allRecords.stream()
-                // 날짜 비교 (DB에서 하면 0.001초인걸 여기서 루프 돌려서 찾음)
-                .filter(r -> {
-                    LocalDate matchDate = r.getMatchDate();
-                    return !matchDate.isBefore(startDate) && !matchDate.isAfter(endDate);
-                })
+        // ❌ 한계: 집계는 여전히 메모리 처리
+        Map<Player, List<MatchRecord>> playerRecordsMap = records.stream()
                 .filter(r -> r.getPlayer() != null)
                 .collect(Collectors.groupingBy(MatchRecord::getPlayer));
 
-        // 3. 통계 계산 (평균 평점, 골, 어시스트)
         List<RecentFormResponseDto> result = playerRecordsMap.entrySet().stream()
                 .map(entry -> {
                     Player player = entry.getKey();
-                    List<MatchRecord> records = entry.getValue();
+                    List<MatchRecord> playerRecords = entry.getValue();
 
-                    int matches = records.size();
-                    // 경기 수가 부족하면 null 리턴해서 아래에서 필터링
+                    int matches = playerRecords.size();
                     if (matches < minMatches) return null;
 
-                    int totalGoals = records.stream().mapToInt(MatchRecord::getGoals).sum();
-                    int totalAssists = records.stream().mapToInt(MatchRecord::getAssists).sum();
-                    double totalRating = records.stream()
+                    int totalGoals = playerRecords.stream().mapToInt(MatchRecord::getGoals).sum();
+                    int totalAssists = playerRecords.stream().mapToInt(MatchRecord::getAssists).sum();
+                    double totalRating = playerRecords.stream()
                             .map(MatchRecord::getRating)
                             .filter(java.util.Objects::nonNull)
                             .mapToDouble(BigDecimal::doubleValue)
@@ -289,13 +340,12 @@ public class PlayerQueryService {
 
                     return RecentFormResponseDto.of(player, matches, totalRating, totalGoals, totalAssists);
                 })
-                .filter(java.util.Objects::nonNull) // 경기 수 부족한 선수 제외
-                // 4. 평균 평점 높은 순 정렬
+                .filter(java.util.Objects::nonNull)
                 .sorted(Comparator.comparingDouble(RecentFormResponseDto::getAvgRating).reversed())
                 .limit(limit)
                 .collect(Collectors.toList());
 
-        log.info("[PLAIN] 최근 폼 조회 완료 - 결과 {}건", result.size());
+        log.info("[INDEX] 최근 폼 조회 완료 - 결과 {}건 (집계는 메모리)", result.size());
         return result;
     }
 

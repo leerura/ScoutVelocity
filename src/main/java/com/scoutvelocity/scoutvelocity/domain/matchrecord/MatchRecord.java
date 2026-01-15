@@ -9,15 +9,18 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 
 /**
- * 경기 기록 엔티티 (Plain Version)
+ * 경기 기록 엔티티 (Step 2: Index)
  * 
- * Step 1: Plain 상태 (인덱스X, 캐시X)
- * - 단방향 연관관계 (MatchRecord → Player)
- * - Player는 MatchRecord 컬렉션을 갖지 않음
- * - Cascade, orphanRemoval 불필요 (독립적 생명주기)
+ * Step 2: 인덱스 추가
+ * - player_id, match_date에 인덱스 추가
+ * - 시나리오 5~7 성능 개선용
  */
 @Entity
-@Table(name = "match_records")
+@Table(name = "match_records", indexes = {
+    @Index(name = "idx_player_id", columnList = "player_id"),
+    @Index(name = "idx_match_date", columnList = "match_date"),
+    @Index(name = "idx_player_date", columnList = "player_id, match_date")
+})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
