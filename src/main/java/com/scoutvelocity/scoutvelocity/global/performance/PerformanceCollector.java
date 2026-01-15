@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -27,19 +28,23 @@ public class PerformanceCollector {
     
     // 요청별 고유 ID (ThreadLocal)
     private final ThreadLocal<String> requestId = ThreadLocal.withInitial(() -> UUID.randomUUID().toString());
-    
+
     /**
-     * 성능 데이터 기록
+     * 성능 데이터 기록 (쿼리 개수 포함)
+     * 중요: 부모 트랜잭션이 readOnly여도 로그는 저장되어야 하므로
+     * 항상 새로운 트랜잭션을 생성(REQUIRES_NEW)해서 실행함.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(Layer layer, String className, String methodName, long durationMs) {
         record(layer, className, methodName, durationMs, null);
     }
     
     /**
      * 성능 데이터 기록 (쿼리 개수 포함)
+     * 중요: 부모 트랜잭션이 readOnly여도 로그는 저장되어야 하므로
+     * 항상 새로운 트랜잭션을 생성(REQUIRES_NEW)해서 실행함.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(Layer layer, String className, String methodName, long durationMs, Integer queryCount) {
         try {
             // 설정값 검증
