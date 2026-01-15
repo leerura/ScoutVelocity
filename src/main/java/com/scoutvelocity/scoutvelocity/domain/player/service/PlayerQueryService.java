@@ -1,5 +1,8 @@
 package com.scoutvelocity.scoutvelocity.domain.player.service;
 
+import com.scoutvelocity.scoutvelocity.domain.matchrecord.MatchRecord;
+import com.scoutvelocity.scoutvelocity.domain.matchrecord.dto.MatchRecordResponseDto;
+import com.scoutvelocity.scoutvelocity.domain.matchrecord.repository.MatchRecordRepository;
 import com.scoutvelocity.scoutvelocity.domain.player.Player;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.PlayerResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.repository.PlayerRepository;
@@ -29,6 +32,7 @@ import java.util.stream.Collectors;
 public class PlayerQueryService {
 
     private final PlayerRepository playerRepository;
+    private final MatchRecordRepository matchRecordRepository;
 
     /**
      * 시나리오 1: 클럽별 선수 조회
@@ -140,6 +144,41 @@ public class PlayerQueryService {
 
         log.info("[PLAIN] 리그+국적 조회 완료 - 전체 {}건", filtered.size());
         return PageResponseDto.of(resultPage);
+    }
+
+    /**
+     * 시나리오 5: 선수별 경기 기록 조회 (JOIN 비효율)
+     *
+     * 비효율 포인트:
+     * 1. Player 전체 로드 (100,000건) - 검증용
+     * 2. MatchRecord 전체 로드 (3,000,000건)
+     * 3. 메모리 상에서 Loop 돌며 매칭 (JOIN)
+     */
+    public List<MatchRecordResponseDto> findMatchRecordsByPlayer(String playerId) {
+        log.info("[PLAIN] 경기 기록 조회 시작 - playerId: {}", playerId);
+
+        // 1. 선수 존재 확인을 위해 전체 로드 (비효율의 극치)
+        List<Player> allPlayers = playerRepository.findAll();
+        boolean playerExists = allPlayers.stream()
+                .anyMatch(p -> p.getId().equals(playerId));
+
+        if (!playerExists) {
+            throw new IllegalArgumentException("Player not found: " + playerId);
+        }
+
+        // 2. 모든 경기 기록 로드 (약 300만 건)
+        log.info("[PLAIN] 전체 경기 기록 로드 시작 (주의: 메모리 급증 예상)");
+        List<MatchRecord> allRecords = matchRecordRepository.findAll();
+        log.info("[PLAIN] 전체 경기 기록 로드 완료 - 총 {}건", allRecords.size());
+
+        // 3. 메모리 JOIN (필터링)
+        List<MatchRecordResponseDto> result = allRecords.stream()
+                .filter(r -> r.getPlayer() != null && r.getPlayer().getId().equals(playerId))
+                .map(MatchRecordResponseDto::from) // DTO 변환
+                .collect(Collectors.toList());
+
+        log.info("[PLAIN] 경기 기록 조회 완료 - 결과 {}건", result.size());
+        return result;
     }
 
     private Comparator<PlayerResponseDto> getComparator(String sortBy) {

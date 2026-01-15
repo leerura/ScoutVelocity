@@ -1,5 +1,6 @@
 package com.scoutvelocity.scoutvelocity.domain.player.controller;
 
+import com.scoutvelocity.scoutvelocity.domain.matchrecord.dto.MatchRecordResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.PlayerResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.service.PlayerQueryService;
 import com.scoutvelocity.scoutvelocity.global.response.ApiResponse;
@@ -124,4 +125,25 @@ public class PlayerController {
         );
         return ApiResponse.success(players);
     }
+
+    /**
+     * 시나리오 5: 선수별 경기 기록 조회 (JOIN 비효율 테스트)
+     *
+     * GET /api/v1/players/{playerId}/match-records
+     *
+     * 목적: 특정 선수의 모든 경기 기록 조회
+     * 비효율: 300만 건의 경기 기록을 메모리에 로드 후 필터링
+     *
+     * 예시:
+     * - GET /api/v1/players/231747/match-records (K. Mbappé)
+     */
+    @GetMapping("/{playerId}/match-records")
+    public ApiResponse<List<MatchRecordResponseDto>> getMatchRecords(
+            @PathVariable String playerId
+    ) {
+        List<MatchRecordResponseDto> records = playerQueryService.findMatchRecordsByPlayer(playerId);
+        return ApiResponse.success(records);
+    }
+
+
 }
