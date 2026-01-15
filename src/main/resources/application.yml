@@ -15,7 +15,7 @@ spring:
     open-in-view: false
     show-sql: true
     hibernate:
-      ddl-auto: create  # 테이블 유지 (create/drop 금지)
+      ddl-auto: update  # 테이블 유지 (create/drop 금지)
     properties:
       hibernate:
         format_sql: true

@@ -1,125 +1,79 @@
 package com.scoutvelocity.scoutvelocity.batch.mapper;
 
 import com.scoutvelocity.scoutvelocity.batch.dto.PlayerDto;
-import org.springframework.batch.item.file.mapping.FieldSetMapper;
 import org.springframework.batch.item.file.transform.FieldSet;
 import org.springframework.validation.BindException;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
-public class PlayerFieldSetMapper implements FieldSetMapper<PlayerDto> {
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+public class PlayerFieldSetMapper extends AbstractFieldSetMapper<PlayerDto> {
 
     @Override
     public PlayerDto mapFieldSet(FieldSet fs) throws BindException {
         PlayerDto p = new PlayerDto();
         try {
-            p.setPlayerId(rS(fs, "playerId")); p.setPlayerUrl(rS(fs, "playerUrl"));
-            p.setFifaVersion(rD(fs, "fifaVersion")); p.setFifaUpdate(rD(fs, "fifaUpdate"));
-            p.setUpdateAsOf(rLD(fs, "updateAsOf")); p.setShortName(rS(fs, "shortName"));
-            p.setLongName(rS(fs, "longName")); p.setPlayerPositions(rS(fs, "playerPositions"));
-            p.setOverall(rI(fs, "overall")); p.setPotential(rI(fs, "potential"));
-            p.setValueEur(rD(fs, "valueEur")); p.setWageEur(rD(fs, "wageEur"));
-            p.setAge(rI(fs, "age")); p.setDob(rLD(fs, "dob"));
-            p.setHeightCm(rI(fs, "heightCm")); p.setWeightKg(rI(fs, "weightKg"));
-            p.setClubTeamId(rD(fs, "clubTeamId")); p.setClubName(rS(fs, "clubName"));
-            p.setLeagueId(rD(fs, "leagueId")); p.setLeagueName(rS(fs, "leagueName"));
-            p.setLeagueLevel(rD(fs, "leagueLevel")); p.setClubPosition(rS(fs, "clubPosition"));
-            p.setClubJerseyNumber(rD(fs, "clubJerseyNumber")); p.setClubLoanedFrom(rS(fs, "clubLoanedFrom"));
-            p.setClubJoinedDate(rLD(fs, "clubJoinedDate"));
-            p.setClubContractValidUntilYear(rID(fs, "clubContractValidUntilYear"));
-            p.setNationalityId(rD(fs, "nationalityId")); p.setNationalityName(rS(fs, "nationalityName"));
-            p.setNationTeamId(rD(fs, "nationTeamId")); p.setNationPosition(rS(fs, "nationPosition"));
-            p.setNationJerseyNumber(rD(fs, "nationJerseyNumber")); p.setPreferredFoot(rS(fs, "preferredFoot"));
-            p.setWeakFoot(rI(fs, "weakFoot")); p.setSkillMoves(rI(fs, "skillMoves"));
-            p.setInternationalReputation(rI(fs, "internationalReputation")); p.setWorkRate(rS(fs, "workRate"));
-            p.setBodyType(rS(fs, "bodyType")); p.setRealFace(rS(fs, "realFace"));
-            p.setReleaseClauseEur(rD(fs, "releaseClauseEur")); p.setPlayerTags(rS(fs, "playerTags"));
-            p.setPlayerTraits(rS(fs, "playerTraits"));
-            p.setPace(rID(fs, "pace")); p.setShooting(rID(fs, "shooting"));
-            p.setPassing(rID(fs, "passing")); p.setDribbling(rID(fs, "dribbling"));
-            p.setDefending(rID(fs, "defending")); p.setPhysic(rID(fs, "physic"));
-            p.setAttackingCrossing(rI(fs, "attackingCrossing"));
-            p.setAttackingFinishing(rI(fs, "attackingFinishing"));
-            p.setAttackingHeadingAccuracy(rI(fs, "attackingHeadingAccuracy"));
-            p.setAttackingShortPassing(rI(fs, "attackingShortPassing"));
-            p.setAttackingVolleys(rI(fs, "attackingVolleys"));
-            p.setSkillDribbling(rI(fs, "skillDribbling")); p.setSkillCurve(rI(fs, "skillCurve"));
-            p.setSkillFkAccuracy(rI(fs, "skillFkAccuracy")); p.setSkillLongPassing(rI(fs, "skillLongPassing"));
-            p.setSkillBallControl(rI(fs, "skillBallControl"));
-            p.setMovementAcceleration(rI(fs, "movementAcceleration"));
-            p.setMovementSprintSpeed(rI(fs, "movementSprintSpeed"));
-            p.setMovementAgility(rI(fs, "movementAgility"));
-            p.setMovementReactions(rI(fs, "movementReactions"));
-            p.setMovementBalance(rI(fs, "movementBalance"));
-            p.setPowerShotPower(rI(fs, "powerShotPower")); p.setPowerJumping(rI(fs, "powerJumping"));
-            p.setPowerStamina(rI(fs, "powerStamina")); p.setPowerStrength(rI(fs, "powerStrength"));
-            p.setPowerLongShots(rI(fs, "powerLongShots"));
-            p.setMentalityAggression(rI(fs, "mentalityAggression"));
-            p.setMentalityInterceptions(rI(fs, "mentalityInterceptions"));
-            p.setMentalityPositioning(rI(fs, "mentalityPositioning"));
-            p.setMentalityVision(rI(fs, "mentalityVision"));
-            p.setMentalityPenalties(rI(fs, "mentalityPenalties"));
-            p.setMentalityComposure(rID(fs, "mentalityComposure"));
-            p.setDefendingMarkingAwareness(rI(fs, "defendingMarkingAwareness"));
-            p.setDefendingStandingTackle(rI(fs, "defendingStandingTackle"));
-            p.setDefendingSlidingTackle(rI(fs, "defendingSlidingTackle"));
-            p.setGoalkeepingDiving(rI(fs, "goalkeepingDiving"));
-            p.setGoalkeepingHandling(rI(fs, "goalkeepingHandling"));
-            p.setGoalkeepingKicking(rI(fs, "goalkeepingKicking"));
-            p.setGoalkeepingPositioning(rI(fs, "goalkeepingPositioning"));
-            p.setGoalkeepingReflexes(rI(fs, "goalkeepingReflexes"));
-            p.setGoalkeepingSpeed(rI(fs, "goalkeepingSpeed"));
-            p.setLs(rS(fs, "ls")); p.setSt(rS(fs, "st")); p.setRs(rS(fs, "rs")); p.setLw(rS(fs, "lw"));
-            p.setLf(rS(fs, "lf")); p.setCf(rS(fs, "cf")); p.setRf(rS(fs, "rf")); p.setRw(rS(fs, "rw"));
-            p.setLam(rS(fs, "lam")); p.setCam(rS(fs, "cam")); p.setRam(rS(fs, "ram")); p.setLm(rS(fs, "lm"));
-            p.setLcm(rS(fs, "lcm")); p.setCm(rS(fs, "cm")); p.setRcm(rS(fs, "rcm")); p.setRm(rS(fs, "rm"));
-            p.setLwb(rS(fs, "lwb")); p.setLdm(rS(fs, "ldm")); p.setCdm(rS(fs, "cdm")); p.setRdm(rS(fs, "rdm"));
-            p.setRwb(rS(fs, "rwb")); p.setLb(rS(fs, "lb")); p.setLcb(rS(fs, "lcb")); p.setCb(rS(fs, "cb"));
-            p.setRcb(rS(fs, "rcb")); p.setRb(rS(fs, "rb")); p.setGk(rS(fs, "gk"));
+            p.setPlayerId(readString(fs, "playerId")); p.setPlayerUrl(readString(fs, "playerUrl"));
+            p.setFifaVersion(readDouble(fs, "fifaVersion")); p.setFifaUpdate(readDouble(fs, "fifaUpdate"));
+            p.setUpdateAsOf(readLocalDate(fs, "updateAsOf")); p.setShortName(readString(fs, "shortName"));
+            p.setLongName(readString(fs, "longName")); p.setPlayerPositions(readString(fs, "playerPositions"));
+            p.setOverall(readInteger(fs, "overall")); p.setPotential(readInteger(fs, "potential"));
+            p.setValueEur(readDouble(fs, "valueEur")); p.setWageEur(readDouble(fs, "wageEur"));
+            p.setAge(readInteger(fs, "age")); p.setDob(readLocalDate(fs, "dob"));
+            p.setHeightCm(readInteger(fs, "heightCm")); p.setWeightKg(readInteger(fs, "weightKg"));
+            p.setClubTeamId(readDouble(fs, "clubTeamId")); p.setClubName(readString(fs, "clubName"));
+            p.setLeagueId(readDouble(fs, "leagueId")); p.setLeagueName(readString(fs, "leagueName"));
+            p.setLeagueLevel(readDouble(fs, "leagueLevel")); p.setClubPosition(readString(fs, "clubPosition"));
+            p.setClubJerseyNumber(readDouble(fs, "clubJerseyNumber")); p.setClubLoanedFrom(readString(fs, "clubLoanedFrom"));
+            p.setClubJoinedDate(readLocalDate(fs, "clubJoinedDate"));
+            p.setClubContractValidUntilYear(readIntegerFromDouble(fs, "clubContractValidUntilYear"));
+            p.setNationalityId(readDouble(fs, "nationalityId")); p.setNationalityName(readString(fs, "nationalityName"));
+            p.setNationTeamId(readDouble(fs, "nationTeamId")); p.setNationPosition(readString(fs, "nationPosition"));
+            p.setNationJerseyNumber(readDouble(fs, "nationJerseyNumber")); p.setPreferredFoot(readString(fs, "preferredFoot"));
+            p.setWeakFoot(readInteger(fs, "weakFoot")); p.setSkillMoves(readInteger(fs, "skillMoves"));
+            p.setInternationalReputation(readInteger(fs, "internationalReputation")); p.setWorkRate(readString(fs, "workRate"));
+            p.setBodyType(readString(fs, "bodyType")); p.setRealFace(readString(fs, "realFace"));
+            p.setReleaseClauseEur(readDouble(fs, "releaseClauseEur")); p.setPlayerTags(readString(fs, "playerTags"));
+            p.setPlayerTraits(readString(fs, "playerTraits"));
+            p.setPace(readIntegerFromDouble(fs, "pace")); p.setShooting(readIntegerFromDouble(fs, "shooting"));
+            p.setPassing(readIntegerFromDouble(fs, "passing")); p.setDribbling(readIntegerFromDouble(fs, "dribbling"));
+            p.setDefending(readIntegerFromDouble(fs, "defending")); p.setPhysic(readIntegerFromDouble(fs, "physic"));
+            p.setAttackingCrossing(readInteger(fs, "attackingCrossing"));
+            p.setAttackingFinishing(readInteger(fs, "attackingFinishing"));
+            p.setAttackingHeadingAccuracy(readInteger(fs, "attackingHeadingAccuracy"));
+            p.setAttackingShortPassing(readInteger(fs, "attackingShortPassing"));
+            p.setAttackingVolleys(readInteger(fs, "attackingVolleys"));
+            p.setSkillDribbling(readInteger(fs, "skillDribbling")); p.setSkillCurve(readInteger(fs, "skillCurve"));
+            p.setSkillFkAccuracy(readInteger(fs, "skillFkAccuracy")); p.setSkillLongPassing(readInteger(fs, "skillLongPassing"));
+            p.setSkillBallControl(readInteger(fs, "skillBallControl"));
+            p.setMovementAcceleration(readInteger(fs, "movementAcceleration"));
+            p.setMovementSprintSpeed(readInteger(fs, "movementSprintSpeed"));
+            p.setMovementAgility(readInteger(fs, "movementAgility"));
+            p.setMovementReactions(readInteger(fs, "movementReactions"));
+            p.setMovementBalance(readInteger(fs, "movementBalance"));
+            p.setPowerShotPower(readInteger(fs, "powerShotPower")); p.setPowerJumping(readInteger(fs, "powerJumping"));
+            p.setPowerStamina(readInteger(fs, "powerStamina")); p.setPowerStrength(readInteger(fs, "powerStrength"));
+            p.setPowerLongShots(readInteger(fs, "powerLongShots"));
+            p.setMentalityAggression(readInteger(fs, "mentalityAggression"));
+            p.setMentalityInterceptions(readInteger(fs, "mentalityInterceptions"));
+            p.setMentalityPositioning(readInteger(fs, "mentalityPositioning"));
+            p.setMentalityVision(readInteger(fs, "mentalityVision"));
+            p.setMentalityPenalties(readInteger(fs, "mentalityPenalties"));
+            p.setMentalityComposure(readIntegerFromDouble(fs, "mentalityComposure"));
+            p.setDefendingMarkingAwareness(readInteger(fs, "defendingMarkingAwareness"));
+            p.setDefendingStandingTackle(readInteger(fs, "defendingStandingTackle"));
+            p.setDefendingSlidingTackle(readInteger(fs, "defendingSlidingTackle"));
+            p.setGoalkeepingDiving(readInteger(fs, "goalkeepingDiving"));
+            p.setGoalkeepingHandling(readInteger(fs, "goalkeepingHandling"));
+            p.setGoalkeepingKicking(readInteger(fs, "goalkeepingKicking"));
+            p.setGoalkeepingPositioning(readInteger(fs, "goalkeepingPositioning"));
+            p.setGoalkeepingReflexes(readInteger(fs, "goalkeepingReflexes"));
+            p.setGoalkeepingSpeed(readInteger(fs, "goalkeepingSpeed"));
+            p.setLs(readString(fs, "ls")); p.setSt(readString(fs, "st")); p.setRs(readString(fs, "rs")); p.setLw(readString(fs, "lw"));
+            p.setLf(readString(fs, "lf")); p.setCf(readString(fs, "cf")); p.setRf(readString(fs, "rf")); p.setRw(readString(fs, "rw"));
+            p.setLam(readString(fs, "lam")); p.setCam(readString(fs, "cam")); p.setRam(readString(fs, "ram")); p.setLm(readString(fs, "lm"));
+            p.setLcm(readString(fs, "lcm")); p.setCm(readString(fs, "cm")); p.setRcm(readString(fs, "rcm")); p.setRm(readString(fs, "rm"));
+            p.setLwb(readString(fs, "lwb")); p.setLdm(readString(fs, "ldm")); p.setCdm(readString(fs, "cdm")); p.setRdm(readString(fs, "rdm"));
+            p.setRwb(readString(fs, "rwb")); p.setLb(readString(fs, "lb")); p.setLcb(readString(fs, "lcb")); p.setCb(readString(fs, "cb"));
+            p.setRcb(readString(fs, "rcb")); p.setRb(readString(fs, "rb")); p.setGk(readString(fs, "gk"));
             return p;
         } catch (Exception e) { throw new BindException(p, "target"); }
-    }
-
-    private String rS(FieldSet fs, String n) {
-        String v = fs.readString(n);
-        return (v == null || v.trim().isEmpty()) ? null : v.trim();
-    }
-
-    private Long rL(FieldSet fs, String n) {
-        try {
-            String v = fs.readString(n);
-            return (v == null || v.trim().isEmpty()) ? null : Long.parseLong(v.trim());
-        } catch (NumberFormatException e) { return null; }
-    }
-
-    private Integer rI(FieldSet fs, String n) {
-        try {
-            String v = fs.readString(n);
-            return (v == null || v.trim().isEmpty()) ? null : Integer.parseInt(v.trim());
-        } catch (NumberFormatException e) { return null; }
-    }
-
-    private Integer rID(FieldSet fs, String n) {
-        try {
-            String v = fs.readString(n);
-            if (v == null || v.trim().isEmpty()) return null;
-            Double d = Double.parseDouble(v.trim());
-            return Integer.valueOf(d.intValue());
-        } catch (NumberFormatException e) { return null; }
-    }
-
-    private Double rD(FieldSet fs, String n) {
-        try {
-            String v = fs.readString(n);
-            return (v == null || v.trim().isEmpty()) ? null : Double.parseDouble(v.trim());
-        } catch (NumberFormatException e) { return null; }
-    }
-
-    private LocalDate rLD(FieldSet fs, String n) {
-        try {
-            String v = fs.readString(n);
-            return (v == null || v.trim().isEmpty()) ? null : LocalDate.parse(v.trim(), DATE_FORMATTER);
-        } catch (Exception e) { return null; }
     }
 }
