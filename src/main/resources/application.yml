@@ -1,6 +1,15 @@
 spring:
+  profiles:
+    active: local
+
   application:
     name: ScoutVelocity
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/scout_velocity?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: root
+    password: your_password  # 실제 비밀번호로 변경하세요
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     open-in-view: false
@@ -11,11 +20,23 @@ spring:
       hibernate:
         format_sql: true
         generate_statistics: true  # Hibernate Statistics 활성화
+        jdbc:
+          batch_size: 1000  # Batch Insert 성능 최적화
+        order_inserts: true  # Insert 순서 최적화
+        order_updates: true  # Update 순서 최적화
+
+  # Spring Batch 설정
+  batch:
+    job:
+      enabled: false  # 자동 실행 방지 (수동 실행)
+    jdbc:
+      initialize-schema: always  # Batch 메타 테이블 자동 생성
 
 logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.batch: INFO
 
 # 성능 측정 설정
 performance:
