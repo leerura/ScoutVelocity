@@ -2,6 +2,7 @@ package com.scoutvelocity.scoutvelocity.domain.player.controller;
 
 import com.scoutvelocity.scoutvelocity.domain.matchrecord.dto.MatchRecordResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.PlayerResponseDto;
+import com.scoutvelocity.scoutvelocity.domain.player.dto.RecentFormResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.TopScorerResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.service.PlayerQueryService;
 import com.scoutvelocity.scoutvelocity.global.response.ApiResponse;
@@ -9,6 +10,7 @@ import com.scoutvelocity.scoutvelocity.global.response.PageResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -169,6 +171,37 @@ public class PlayerController {
     ) {
         List<TopScorerResponseDto> result = playerQueryService.findTopScorers(
                 position, minGoals, minAssists, limit
+        );
+        return ApiResponse.success(result);
+    }
+
+    /**
+     * 시나리오 7: 최근 폼 상태 조회 (날짜 범위 + 집계 비효율 테스트)
+     *
+     * GET /api/v1/players/recent-form
+     *
+     * Query Parameters:
+     * - startDate: 시작일 (YYYY-MM-DD)
+     * - endDate: 종료일 (YYYY-MM-DD)
+     * - minMatches: 최소 경기 수
+     * - limit: 조회 개수
+     *
+     * 예시:
+     * - GET /api/v1/players/recent-form?startDate=2024-01-01&endDate=2024-03-31&minMatches=5
+     */
+    @GetMapping("/recent-form")
+    public ApiResponse<List<RecentFormResponseDto>> getRecentForm(
+            @RequestParam(required = false) LocalDate startDate,
+            @RequestParam(required = false) LocalDate endDate,
+            @RequestParam(defaultValue = "5") int minMatches,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        // 기본값 설정 (최근 3개월)
+        if (startDate == null) startDate = LocalDate.now().minusMonths(3);
+        if (endDate == null) endDate = LocalDate.now();
+
+        List<RecentFormResponseDto> result = playerQueryService.findRecentForm(
+                startDate, endDate, minMatches, limit
         );
         return ApiResponse.success(result);
     }

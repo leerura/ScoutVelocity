@@ -5,6 +5,7 @@ import com.scoutvelocity.scoutvelocity.domain.matchrecord.dto.MatchRecordRespons
 import com.scoutvelocity.scoutvelocity.domain.matchrecord.repository.MatchRecordRepository;
 import com.scoutvelocity.scoutvelocity.domain.player.Player;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.PlayerResponseDto;
+import com.scoutvelocity.scoutvelocity.domain.player.dto.RecentFormResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.TopScorerResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.repository.PlayerRepository;
 import com.scoutvelocity.scoutvelocity.global.response.PageResponseDto;
@@ -17,6 +18,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -246,5 +249,66 @@ public class PlayerQueryService {
             default -> Comparator.comparing(PlayerResponseDto::getOverall,
                     Comparator.nullsLast(Comparator.naturalOrder()));
         };
+    }
+
+    /**
+     * 시나리오 7: 최근 폼 상태 조회 (날짜 범위 + 집계)
+     *
+     * 비효율 포인트:
+     * - 300만 건 전체 로드 (findAll)
+     * - 날짜 범위 필터링을 메모리에서 수행 (DB Index 미사용)
+     * - 선수별 평균 계산 (메모리)
+     * - 정렬 (메모리)
+     */
+    public List<RecentFormResponseDto> findRecentForm(
+            LocalDate startDate,
+            LocalDate endDate,
+            int minMatches,
+            int limit
+    ) {
+        log.info("[PLAIN] 최근 폼 조회 시작 - {} ~ {}, minMatches: {}", startDate, endDate, minMatches);
+
+        // 1. 전체 경기 기록 로드 (300만 건) - 역시나 여기서부터 헬게이트 오픈
+        List<MatchRecord> allRecords = matchRecordRepository.findAll();
+        log.info("[PLAIN] 전체 경기 기록 로드 완료 - 총 {}건", allRecords.size());
+
+        // 2. 메모리에서 날짜 필터링 & 선수별 그룹핑
+        Map<Player, List<MatchRecord>> playerRecordsMap = allRecords.stream()
+                // 날짜 비교 (DB에서 하면 0.001초인걸 여기서 루프 돌려서 찾음)
+                .filter(r -> {
+                    LocalDate matchDate = r.getMatchDate();
+                    return !matchDate.isBefore(startDate) && !matchDate.isAfter(endDate);
+                })
+                .filter(r -> r.getPlayer() != null)
+                .collect(Collectors.groupingBy(MatchRecord::getPlayer));
+
+        // 3. 통계 계산 (평균 평점, 골, 어시스트)
+        List<RecentFormResponseDto> result = playerRecordsMap.entrySet().stream()
+                .map(entry -> {
+                    Player player = entry.getKey();
+                    List<MatchRecord> records = entry.getValue();
+
+                    int matches = records.size();
+                    // 경기 수가 부족하면 null 리턴해서 아래에서 필터링
+                    if (matches < minMatches) return null;
+
+                    int totalGoals = records.stream().mapToInt(MatchRecord::getGoals).sum();
+                    int totalAssists = records.stream().mapToInt(MatchRecord::getAssists).sum();
+                    double totalRating = records.stream()
+                            .map(MatchRecord::getRating)
+                            .filter(java.util.Objects::nonNull)
+                            .mapToDouble(BigDecimal::doubleValue)
+                            .sum();
+
+                    return RecentFormResponseDto.of(player, matches, totalRating, totalGoals, totalAssists);
+                })
+                .filter(java.util.Objects::nonNull) // 경기 수 부족한 선수 제외
+                // 4. 평균 평점 높은 순 정렬
+                .sorted(Comparator.comparingDouble(RecentFormResponseDto::getAvgRating).reversed())
+                .limit(limit)
+                .collect(Collectors.toList());
+
+        log.info("[PLAIN] 최근 폼 조회 완료 - 결과 {}건", result.size());
+        return result;
     }
 }
