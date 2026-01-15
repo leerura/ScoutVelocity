@@ -5,6 +5,7 @@ import com.scoutvelocity.scoutvelocity.domain.matchrecord.dto.MatchRecordRespons
 import com.scoutvelocity.scoutvelocity.domain.matchrecord.repository.MatchRecordRepository;
 import com.scoutvelocity.scoutvelocity.domain.player.Player;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.PlayerResponseDto;
+import com.scoutvelocity.scoutvelocity.domain.player.dto.TopScorerResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.repository.PlayerRepository;
 import com.scoutvelocity.scoutvelocity.global.response.PageResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -178,6 +180,58 @@ public class PlayerQueryService {
                 .collect(Collectors.toList());
 
         log.info("[PLAIN] 경기 기록 조회 완료 - 결과 {}건", result.size());
+        return result;
+    }
+
+    /**
+     * 시나리오 6: 골 + 어시스트 상위 공격수 조회 (메모리 집계)
+     *
+     * 비효율 포인트:
+     * - 300만 건 MatchRecord 전체 로드
+     * - 메모리에서 GROUP BY (선수별 집계)
+     * - 메모리에서 정렬 & 필터링
+     */
+    public List<TopScorerResponseDto> findTopScorers(
+            String position,
+            Integer minGoals,
+            Integer minAssists,
+            int limit
+    ) {
+        log.info("[PLAIN] 상위 득점자 집계 시작 - position: {}, minGoals: {}, minAssists: {}", position, minGoals, minAssists);
+
+        // 1. 전체 경기 기록 로드 (IO & 메모리 폭발)
+        List<MatchRecord> allRecords = matchRecordRepository.findAll();
+        log.info("[PLAIN] 전체 경기 기록 로드 완료 - 총 {}건", allRecords.size());
+
+        // 2. 메모리 상에서 데이터 가공 (CPU 부하)
+        // 선수별(Player)로 기록(MatchRecord)을 그룹핑
+        Map<Player, List<MatchRecord>> playerRecordsMap = allRecords.stream()
+                // 2-1. 포지션 필터링 (N+1 발생 가능: player.getPlayerPositions 접근 시)
+                .filter(r -> position == null ||
+                        (r.getPlayer() != null && r.getPlayer().getPlayerPositions().contains(position)))
+                .collect(Collectors.groupingBy(MatchRecord::getPlayer));
+
+        // 3. 그룹핑된 데이터로 통계 계산 (SUM)
+        List<TopScorerResponseDto> result = playerRecordsMap.entrySet().stream()
+                .map(entry -> {
+                    Player player = entry.getKey();
+                    List<MatchRecord> records = entry.getValue();
+
+                    int totalGoals = records.stream().mapToInt(MatchRecord::getGoals).sum();
+                    int totalAssists = records.stream().mapToInt(MatchRecord::getAssists).sum();
+
+                    return TopScorerResponseDto.of(player, totalGoals, totalAssists);
+                })
+                // 4. 집계 후 조건 필터링 (HAVING 절을 메모리에서 처리)
+                .filter(dto -> minGoals == null || dto.getTotalGoals() >= minGoals)
+                .filter(dto -> minAssists == null || dto.getTotalAssists() >= minAssists)
+                // 5. 정렬 (ORDER BY를 메모리에서 처리)
+                .sorted(Comparator.comparingInt(TopScorerResponseDto::getTotalPoints).reversed())
+                // 6. 개수 제한 (LIMIT)
+                .limit(limit)
+                .collect(Collectors.toList());
+
+        log.info("[PLAIN] 상위 득점자 집계 완료 - 결과 {}건", result.size());
         return result;
     }
 

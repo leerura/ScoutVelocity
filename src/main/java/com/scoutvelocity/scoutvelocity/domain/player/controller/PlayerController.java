@@ -2,6 +2,7 @@ package com.scoutvelocity.scoutvelocity.domain.player.controller;
 
 import com.scoutvelocity.scoutvelocity.domain.matchrecord.dto.MatchRecordResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.dto.PlayerResponseDto;
+import com.scoutvelocity.scoutvelocity.domain.player.dto.TopScorerResponseDto;
 import com.scoutvelocity.scoutvelocity.domain.player.service.PlayerQueryService;
 import com.scoutvelocity.scoutvelocity.global.response.ApiResponse;
 import com.scoutvelocity.scoutvelocity.global.response.PageResponseDto;
@@ -145,5 +146,30 @@ public class PlayerController {
         return ApiResponse.success(records);
     }
 
-
+    /**
+     * 시나리오 6: 골 + 어시스트 상위 공격수 (집계 쿼리 비효율 테스트)
+     *
+     * GET /api/v1/players/top-scorers
+     *
+     * Query Parameters:
+     * - position: 포지션 (예: ST, RW, LW)
+     * - minGoals: 최소 득점
+     * - minAssists: 최소 도움
+     * - limit: 조회 개수 (기본 20)
+     *
+     * 예시:
+     * - GET /api/v1/players/top-scorers?position=ST&minGoals=10&minAssists=5&limit=10
+     */
+    @GetMapping("/top-scorers")
+    public ApiResponse<List<TopScorerResponseDto>> getTopScorers(
+            @RequestParam(required = false) String position,
+            @RequestParam(required = false) Integer minGoals,
+            @RequestParam(required = false) Integer minAssists,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        List<TopScorerResponseDto> result = playerQueryService.findTopScorers(
+                position, minGoals, minAssists, limit
+        );
+        return ApiResponse.success(result);
+    }
 }
